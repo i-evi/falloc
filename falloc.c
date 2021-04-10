@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 
 #include "bmpalloc.h"
+#define _LINKLIST_IMPL_
 #include "falloc.h"
 
 static off_t _fsize(int fd)
@@ -255,23 +256,34 @@ void falloc_close(struct falloc_allocator *allocator)
 	}
 }
 
-void falloc_scan(struct falloc_allocator *allocator)
+linklist_node_t *falloc_scan(struct falloc_allocator *allocator)
 {
-	size_t i, l, step;
+	size_t i, l, step, off, order, alloc_size;
 	unsigned char *csr = (unsigned char*)allocator->mpool;
+	linklist_node_t *pls, *ls;
 	if (!allocator->order)
-		return;
+		return NULL;
+	pls = (ls = (linklist_node_t*)calloc(1, sizeof(linklist_node_t)));
 	l = allocator->order - allocator->min_order + 1;
 	for (i = 0; i < l; ++i) {
 		bmp_state_reset(allocator->alloc_table[i]);
 	}
-	step = ((size_t)1) << allocator->min_order;
-	printf("%d\n", step);
-	exit(0);
-	i = *((size_t*)csr);
-	if (i) {
-		/**/
+	alloc_size = allocator->filelen - FALLOC_MPOOL_OFF;
+	for (off = 0; off < alloc_size;) {
+		i = *(size_t*)(csr + off);
+		if (i) {
+			order = _log2size_t(i + sizeof(size_t));
+			step = ((size_t)1) << order;
+			_alloc_table_alloc(allocator,
+				order - allocator->min_order, off / step);
+			pls = linklist_append(pls);
+			pls->d = allocator->mpool + off;
+			off += step;
+		} else {
+			off += (size_t)1 << allocator->min_order;
+		}
 	}
+	return ls;
 }
 
 void *falloc_blk_alloc(struct falloc_allocator *allocator, size_t size)

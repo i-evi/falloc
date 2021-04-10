@@ -24,8 +24,13 @@ int main()
 	printf("%s\n", buffer);
 	ffree(buffer);
 
+	/* Do not free these buffers. They can be found by falloc_scan. */
+	for (int i = 0; i < 10; ++i) {
+		buffer = (char*)falloc(256);
+		sprintf(buffer, "Buffer: %d\n", i);
+	}
+	
 	falloc_print_info(allocator);
 	falloc_close(allocator);
 	return 0;
 }
-
